@@ -2,9 +2,11 @@
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local StarterGui = game:GetService("StarterGui")
+local Players = game:GetService("Players")
 
 -- Character and Ability Information
-local character = game.Players.LocalPlayer.Character or game.Players.LocalPlayer.CharacterAdded:Wait()
+local localPlayer = Players.LocalPlayer
+local character = localPlayer.Character or localPlayer.CharacterAdded:Wait()
 local abilities = {
     Slash = {cooldown = 5, action = function() showAbilityStatus("Slash activated!") end},
     Charge = {cooldown = 10, action = function() showAbilityStatus("Charge activated!") end},
@@ -21,13 +23,13 @@ local characterModels = {
     {id = 9407080575, name = "Pro", info = "A more advanced character with enhanced stats."},
     {id = 5195518884, name = "Custom", info = "A custom starter character with unique abilities."}
 }
-local currentModelIndex = 0
+local currentModelIndex = 1
 
 -- Utility Functions
 local function safeCall(func, ...)
-    local success, result = xpcall(func, function(err) print("Error:", err) end, ...)
+    local success, result = pcall(func, ...)
     if not success then
-        print("An error occurred but was safely caught.")
+        print("Error:", result)
     end
     return success, result
 end
@@ -35,7 +37,6 @@ end
 -- Function to Create BillboardGui
 local function createInfoBillboard(character, text)
     local billboardGui = Instance.new("BillboardGui")
-    billboardGui.Name = "CharacterInfo"
     billboardGui.Size = UDim2.new(0, 200, 0, 50)
     billboardGui.StudsOffset = Vector3.new(0, 3, 0)
     billboardGui.Adornee = character.Head
@@ -107,7 +108,7 @@ end
 
 -- Function to switch character models
 local function switchCharacterModel()
-    currentModelIndex = currentModelIndex % #characterModels + 1
+    currentModelIndex = (currentModelIndex % #characterModels) + 1
     local modelInfo = characterModels[currentModelIndex]
     
     -- Load new character model
@@ -145,6 +146,14 @@ local function createNotificationGui()
     })
 end
 
+-- Function to handle player damage
+local function onHit(otherPlayer)
+    if otherPlayer:IsA("Player") and otherPlayer ~= localPlayer then
+        otherPlayer:TakeDamage(10) -- Example damage value
+        showAbilityStatus("You hit " .. otherPlayer.Name .. " for 10 damage!")
+    end
+end
+
 -- Event listener for input actions
 local function onInputBegan(input, gameProcessed)
     if gameProcessed then return end
@@ -169,10 +178,16 @@ end
 -- Connect input event
 UserInputService.InputBegan:Connect(onInputBegan)
 
+-- Connect collision event to handle hits
+local characterHumanoid = character:FindFirstChildOfClass("Humanoid")
+if characterHumanoid then
+    characterHumanoid.Touched:Connect(onHit)
+end
+
 -- Initialize the character with the first model
 switchCharacterModel()
 
 -- Show notification
 createNotificationGui()
 
-print("Character and ability script loaded successfully!")
+print("Interactive character and ability script loaded successfully!")
