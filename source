@@ -1,0 +1,178 @@
+-- Import services
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local StarterGui = game:GetService("StarterGui")
+
+-- Character and Ability Information
+local character = game.Players.LocalPlayer.Character or game.Players.LocalPlayer.CharacterAdded:Wait()
+local abilities = {
+    Slash = {cooldown = 5, action = function() showAbilityStatus("Slash activated!") end},
+    Charge = {cooldown = 10, action = function() showAbilityStatus("Charge activated!") end},
+    EnergyBall = {cooldown = 15, action = function() showAbilityStatus("Energy Ball activated!") end},
+    LongSlash = {cooldown = 20, action = function() showAbilityStatus("Long Slash activated!") end},
+    Heal = {cooldown = 30, action = function() showAbilityStatus("Heal activated!") end},
+    Reload = {cooldown = 5, action = function() showAbilityStatus("Reload activated!") end}
+}
+local cooldowns = {}
+
+-- Character Models Info
+local characterModels = {
+    {id = 8783146502, name = "Noob", info = "The classic starter character, a symbol of new beginnings."},
+    {id = 9407080575, name = "Pro", info = "A more advanced character with enhanced stats."},
+    {id = 5195518884, name = "Custom", info = "A custom starter character with unique abilities."}
+}
+local currentModelIndex = 0
+
+-- Utility Functions
+local function safeCall(func, ...)
+    local success, result = xpcall(func, function(err) print("Error:", err) end, ...)
+    if not success then
+        print("An error occurred but was safely caught.")
+    end
+    return success, result
+end
+
+-- Function to Create BillboardGui
+local function createInfoBillboard(character, text)
+    local billboardGui = Instance.new("BillboardGui")
+    billboardGui.Name = "CharacterInfo"
+    billboardGui.Size = UDim2.new(0, 200, 0, 50)
+    billboardGui.StudsOffset = Vector3.new(0, 3, 0)
+    billboardGui.Adornee = character.Head
+    billboardGui.Parent = character.Head
+
+    local textLabel = Instance.new("TextLabel")
+    textLabel.Size = UDim2.new(1, 0, 1, 0)
+    textLabel.Text = text
+    textLabel.TextColor3 = Color3.new(1, 1, 1)
+    textLabel.BackgroundTransparency = 1
+    textLabel.Font = Enum.Font.SourceSansBold
+    textLabel.TextScaled = true
+    textLabel.Parent = billboardGui
+end
+
+-- Function to show ability status above the character's head
+local function showAbilityStatus(text)
+    local billboardGui = character.Head:FindFirstChild("AbilityStatus") or Instance.new("BillboardGui")
+    billboardGui.Name = "AbilityStatus"
+    billboardGui.Size = UDim2.new(0, 200, 0, 50)
+    billboardGui.StudsOffset = Vector3.new(0, 3, 0)
+    billboardGui.Adornee = character.Head
+    billboardGui.Parent = character.Head
+    
+    local textLabel = billboardGui:FindFirstChild("TextLabel") or Instance.new("TextLabel")
+    textLabel.Size = UDim2.new(1, 0, 1, 0)
+    textLabel.Text = text
+    textLabel.TextColor3 = Color3.new(1, 1, 1)
+    textLabel.BackgroundTransparency = 1
+    textLabel.Font = Enum.Font.SourceSansBold
+    textLabel.TextScaled = true
+    textLabel.Parent = billboardGui
+
+    -- Hide the status after a few seconds
+    delay(3, function()
+        textLabel.Text = ""
+    end)
+end
+
+-- Function to activate abilities with cooldowns
+local function activateAbility(abilityName)
+    local ability = abilities[abilityName]
+    if not ability then return end
+    
+    if not cooldowns[abilityName] or (tick() - cooldowns[abilityName]) >= ability.cooldown then
+        cooldowns[abilityName] = tick()
+        safeCall(ability.action)
+    else
+        local remainingTime = ability.cooldown - (tick() - cooldowns[abilityName])
+        showAbilityStatus(abilityName .. " is on cooldown. Please wait " .. math.ceil(remainingTime) .. " seconds.")
+    end
+end
+
+-- Function for reload animation
+local function reloadAnimation()
+    local reloadPart = character:FindFirstChild("HumanoidRootPart")
+    if reloadPart then
+        local tweenInfo = TweenInfo.new(2, Enum.EasingStyle.Linear, Enum.EasingDirection.Out)
+        local tween = TweenService:Create(reloadPart, tweenInfo, {CFrame = reloadPart.CFrame * CFrame.new(0, 0, 1)})
+        tween:Play()
+        tween.Completed:Wait()
+
+        -- Reset position
+        local tweenBack = TweenService:Create(reloadPart, tweenInfo, {CFrame = reloadPart.CFrame * CFrame.new(0, 0, -1)})
+        tweenBack:Play()
+        showAbilityStatus("Reload animation completed!")
+    end
+end
+
+-- Function to switch character models
+local function switchCharacterModel()
+    currentModelIndex = currentModelIndex % #characterModels + 1
+    local modelInfo = characterModels[currentModelIndex]
+    
+    -- Load new character model
+    safeCall(function()
+        local newModel = game:GetService("InsertService"):LoadAsset(modelInfo.id):GetChildren()[1]
+        newModel.Parent = character
+        newModel:SetPrimaryPartCFrame(character.PrimaryPart.CFrame)
+        character.PrimaryPart = newModel.PrimaryPart
+        
+        -- Remove previous model parts
+        for _, part in ipairs(character:GetChildren()) do
+            if part:IsA("Model") and part ~= newModel then
+                part:Destroy()
+            end
+        end
+
+        -- Update character head BillboardGui
+        local head = character:FindFirstChild("Head")
+        if head then
+            local existingBillboard = head:FindFirstChild("CharacterInfo")
+            if existingBillboard then
+                existingBillboard:Destroy()
+            end
+            createInfoBillboard(character, modelInfo.name .. ": " .. modelInfo.info)
+        end
+    end)
+end
+
+-- Function to create NotificationGui
+local function createNotificationGui()
+    StarterGui:SetCore("SendNotification", {
+        Title = "Info",
+        Text = "Discord - meowbucks",
+        Duration = 5
+    })
+end
+
+-- Event listener for input actions
+local function onInputBegan(input, gameProcessed)
+    if gameProcessed then return end
+
+    if input.KeyCode == Enum.KeyCode.F then
+        safeCall(activateAbility, "Slash")
+    elseif input.KeyCode == Enum.KeyCode.G then
+        safeCall(activateAbility, "Charge")
+    elseif input.KeyCode == Enum.KeyCode.H then
+        safeCall(activateAbility, "EnergyBall")
+    elseif input.KeyCode == Enum.KeyCode.J then
+        safeCall(activateAbility, "LongSlash")
+    elseif input.KeyCode == Enum.KeyCode.K then
+        safeCall(activateAbility, "Heal")
+    elseif input.KeyCode == Enum.KeyCode.R then
+        safeCall(reloadAnimation)
+    elseif input.KeyCode == Enum.KeyCode.E then
+        safeCall(switchCharacterModel)
+    end
+end
+
+-- Connect input event
+UserInputService.InputBegan:Connect(onInputBegan)
+
+-- Initialize the character with the first model
+switchCharacterModel()
+
+-- Show notification
+createNotificationGui()
+
+print("Character and ability script loaded successfully!")
